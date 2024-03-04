@@ -1,51 +1,52 @@
-from pyspark.sql import SparkSession
+from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.functions import col, regexp_extract, trim
-
-from config import host, password, user, db_name
+import Config
 
 spark = SparkSession.builder \
     .master("local[*]") \
     .appName('SparkTest') \
-    .config("spark.driver.extraClassPath", "C:/spark/postgresql-42.7.1.jar") \
+    .config("spark.driver.extraClassPath", "./Libs/postgresql-42.7.1.jar") \
     .getOrCreate()
 
-df = (spark.read.format("csv")
-      .option("sep", ";")
-      .option("header", "true")
-      .option("inferSchema", "true")
-      .load("1.csv")
-      )
+
+def read_data() -> DataFrame:
+    print("Reading data...")
+    df = (spark.read.format("csv")
+          .option("sep", ";")
+          .option("header", "true")
+          .option("inferSchema", "true")
+          .load(Config.get_sours_path())
+          )
+    return df
 
 
-
-# df.printSchema()
-
-# test_csv = (
-#     df.select(col('DESCR').alias('descr'), col('FIO').alias('fio'), col('DataRogdenia').alias('data_rogdenia'),
-#               col('TelKont').alias('tel_kont'), col('DataSozdania').alias('data_sozdania'),
-#               col('DenRoghdenia').alias('den_roghdenia'), col('ProcentSkidki').alias('procent_skidki'))
-# )
-# test_csv.select("descr", "fio", "data_rogdenia", regexp_replace("tel_kont", ), "data_sozdania" , "den_roghdenia", "procent_skidki") .show()
-# test_csv.select(regexp_extract('tel_kont', r'(?:\+|\d)[\d\-\(\) ]{9,}\d', 0)).show()
-
-
-kb_sort_df = (df.select(col('DESCR').alias('descr')
-                      , col('FIO').alias('fio')
-                      , col('DataRogdenia').alias('data_rogdenia')
-                      , trim(col('TelKont')).alias('tel_kont')
-                      , col('DataSozdania').alias('data_sozdania')
-                      , col('DenRoghdenia').alias('den_roghdenia')
-                      , col('ProcentSkidki').alias('procent_skidki'))
-            ).filter(col('tel_kont') == regexp_extract('tel_kont', r'^((8|(\+7))[\- ]?)(\(?\d{3}\)?[\- ]?)?[\d\- ]{7,10}$', 0))
+def transform_data(df: DataFrame) -> DataFrame:
+    print("Transforming data...")
+    df = (df.select(col('DESCR').alias('descr')
+                    , col('FIO').alias('fio')
+                    , col('DataRogdenia').alias('data_rogdenia')
+                    , trim(col('TelKont')).alias('tel_kont')
+                    , col('DataSozdania').alias('data_sozdania')
+                    , col('DenRoghdenia').alias('den_roghdenia')
+                    , col('ProcentSkidki').alias('procent_skidki'))
+          ).filter(
+        col('tel_kont') == regexp_extract('tel_kont', r'^((8|(\+7))[\- ]?)(\(?\d{3}\)?[\- ]?)?[\d\- ]{7,10}$', 0))
+    return df
 
 
-kb_sort_df.write\
- .format("jdbc")\
- .mode("overwrite")\
- .option("url", "jdbc:postgresql://5.104.75.54/de_roman")\
- .option("dbtable", "kb_sort")\
- .option("user", "roman")\
- .option("password", "0p9o8i7u6y—")\
- .save()
+def write_data(df: DataFrame):
+    print("Writing data...")
+    df.write \
+        .format("jdbc") \
+        .mode("overwrite") \
+        .option("url", Config.db_url()) \
+        .option("dbtable", Config.db_mane()) \
+        .option("user", Config.get_name()) \
+        .option("password", Config.get_password()) \
+        .save()
 
 
+if __name__ == "__main__":
+    kb_raw_data_df = read_data()
+    transformed_df = transform_data(kb_raw_data_df)
+    write_data(transformed_df)
