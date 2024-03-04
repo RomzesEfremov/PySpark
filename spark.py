@@ -39,7 +39,6 @@ kb_sort_df = (df.select(col('DESCR').alias('descr')
             ).filter(col('tel_kont') == regexp_extract('tel_kont', r'^((8|(\+7))[\- ]?)(\(?\d{3}\)?[\- ]?)?[\d\- ]{7,10}$', 0))
 
 
-
 kb_sort_df.write\
  .format("jdbc")\
  .mode("overwrite")\
